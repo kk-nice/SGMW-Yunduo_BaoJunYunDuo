@@ -4,16 +4,16 @@
     android:versionCode="1"
     android:versionName="1.0">
 
-    <uses-sdk android:minSdkVersion="33" android:targetSdkVersion="33" />
+    <uses-sdk android:minSdkVersion="28" android:targetSdkVersion="28" />
 
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- Android 11+ package visibility: needed to bind the vehicle settings service -->
-    <queries>
-        <package android:name="com.sgmw.vehiclesettings" />
-    </queries>
+    <!--
+        Android 11+ package visibility: needed to bind the vehicle settings service.
+        Only required when targeting API 30+; Android 9 (API 28) has no package
+        visibility restriction, so this block is removed for the Android 9 build.
+    -->
 
     <application
         android:label="行人警示自动关闭"

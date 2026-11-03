@@ -10,6 +10,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
+import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
@@ -146,7 +147,15 @@ public class GuardService extends Service {
         IntentFilter f = new IntentFilter();
         f.addAction(Intent.ACTION_SCREEN_ON);
         f.addAction(Intent.ACTION_SCREEN_OFF);
-        registerReceiver(screenReceiver, f, Context.RECEIVER_NOT_EXPORTED);
+        if (Build.VERSION.SDK_INT >= 33) {
+            // Context.RECEIVER_NOT_EXPORTED is API 33+; keep the constant's value (4)
+            // so this still compiles against the android-28 platform jar.
+            registerReceiver(screenReceiver, f, 4);
+        } else {
+            // Android 9: ACTION_SCREEN_ON/OFF are protected system broadcasts,
+            // only the system can send them, so plain registration is safe here.
+            registerReceiver(screenReceiver, f);
+        }
 
         bind();
         handler.post(tick);

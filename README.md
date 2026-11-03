@@ -123,6 +123,22 @@ export ANDROID_HOME=$HOME/Library/Android/sdk
 
 第一次编译时会自动生成签名文件 `release.keystore`。**请妥善保管它**：以后升级 App 必须用同一个签名，否则要先卸载旧版才能安装新版。
 
+### Android 9（API 28）构建变体
+
+原版面向 Android Automotive 13（API 33）。本仓库的 `build.ps1` 提供 Windows 下的 Android 9 构建变体：
+
+- 需要：JDK 17+、Android SDK `platforms;android-28` 和 `build-tools;35.0.0`（D8 8.3 起才兼容 JDK 21 编译产物）；
+- 相对原版的改动：
+  - `AndroidManifest.xml`：`minSdkVersion`/`targetSdkVersion` 33 → 28；移除 API 33 才有的 `POST_NOTIFICATIONS` 权限；移除 `<queries>`（Android 11+ 才有的包可见性概念，Android 9 无此限制）；
+  - `GuardService.java`：`Context.RECEIVER_NOT_EXPORTED`（API 33+）改为按 `Build.VERSION.SDK_INT` 分支注册屏幕广播，保留 API 33 上的原行为；
+- 编译（Windows）：
+
+```powershell
+.\build.ps1
+```
+
+产物为 `PedestrianWarningOff.apk`（约 16 KB，minSdk 28）。Android 9 无包可见性限制，无需 `<queries>` 即可绑定 `com.sgmw.vehiclesettings` 服务。注意：此变体去掉了 `<queries>`，若同时要在 Android 11+ 设备上安装，请使用面向 API 33 的原版构建。
+
 ## 项目结构
 
 ```
