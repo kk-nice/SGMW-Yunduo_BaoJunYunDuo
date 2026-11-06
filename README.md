@@ -33,7 +33,7 @@
 | 写厂商属性 `0x21705074` 关闭 PWS | ✅ 实车生效 |
 | `android.car.permission.CAR_INFO` 安装即授予 | ✅ `/data/app` 普通安装可用 |
 | 挡位门控（P 挡先 defer，非 P 挡才写） | ✅ 逻辑正确，日志可证 |
-| 每次点火零人工自动启动 | ✅ 经乐酷桌面自启（需一次性配置），见 [`docs/leco-autostart.md`](docs/leco-autostart.md) |
+| 每次点火零人工自动启动 | ✅ 靠桌面自启列表拉起（乐酷已实测，氢桌面等同类桌面同理），见 [`docs/leco-autostart.md`](docs/leco-autostart.md) |
 
 ---
 
@@ -121,6 +121,12 @@ Windows，无需 Gradle，直接用 SDK 工具链：
 乐酷是默认 HOME，熄火时系统只对它执行普通 `am_kill`（reason=0），**不会把它钉进 `stopped`**；它开机后遍历自启列表，对每一项发出 `START_APP`（= `startActivity`）。本应用带 `LAUNCHER` 类别，因此能被列进去。`startActivity` 显式启动组件的同时会把本包的 `stopped` 清掉，之后的 `BootReceiver` / JobScheduler 在这一轮点火里也恢复投递。
 
 机制取证、配置步骤与验收清单见 👉 [`docs/leco-autostart.md`](docs/leco-autostart.md)
+
+### 换其他桌面也行（如氢桌面）
+
+这套机制**不绑定乐酷**。任何桌面只要同时满足三条，就能等效拉起本应用：熄火清理时不被钉进 `stopped`、每次点火后自身会被系统拉起（通常是默认 HOME）、自启列表走**显式启动组件**（`startActivity`）而不是只发广播或只起 Service。
+
+氢桌面这类的第三方桌面若带"开机自启应用"设置项，按同一清单验证即可（本项目仅在乐酷上做过实车验证）。三条条件的具体判定方法与验证命令见 👉 [`docs/leco-autostart.md#七推广到其他桌面如氢桌面`](docs/leco-autostart.md#七推广到其他桌面如氢桌面)
 
 ---
 

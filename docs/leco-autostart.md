@@ -1,4 +1,6 @@
-# 开机自启：乐酷桌面托管（实车已验证）
+# 开机自启：桌面托管（乐酷实测，其他桌面同理）
+
+> 本文以乐酷桌面（`com.lecoauto`）为实测样本，但机制是通用的。换用其他桌面（如氢桌面）时，按第七节的三条条件判定即可，不必重做取证。
 
 ## 结论
 
@@ -80,3 +82,35 @@ adb shell "logcat -d -s PwOff | tail -20"
 | `multimanagerservice` 白名单 | 反编译确认它只有分屏能力，**不存在白名单**，也不主动拉任何 app |
 | 往 `/vendor` 装 init 看守 | `/vendor` 只读且受 dm-verity 保护，`adb root` 的 overlay 重启即丢，改 `vendor.img` 要过 `update_entity` 分区签名 —— 需 root 或改 OTA |
 | 平台签名伪造 | 私钥在五菱柳州侧，OTA 里没有 |
+
+## 七、推广到其他桌面（如氢桌面）
+
+上面这套机制**不绑定乐酷**。乐酷只是恰好同时满足三个条件，任何同时满足这三条的桌面都能等效地拉起本应用：
+
+| 条件 | 为什么必须要 | 怎么判定 |
+|---|---|---|
+| ① 熄火清理时不被钉进 `stopped` | 被钉住的包收不到广播、起不了 Service，也没法被 bind | 熄火后 `logcat -b all | grep "Force stopping"` 里**没有**它的包名；它的 `am_kill` 记录 reason 为 `0` |
+| ② 每次点火后它自己一定会被系统拉起 | 它自己都起不来，就谈不上拉别人 | 它通常是**默认 HOME**（`isDefault=true`）；或另有系统级保活手段 |
+| ③ 它的"自启/已启用应用"列表通过**显式启动组件**拉起应用 | 只有 `startActivity` 会清掉本包的 `stopped`；只发广播或只 `startService` 都无效 | 反编译它的自启实现，看是否走 `startActivity` / `startActivityForResult`，而不是 `sendBroadcast` / `startService` |
+
+氢桌面这类的第三方桌面，若具备"开机自启应用"的设置项，按同一套清单验证即可；**本项目只在乐酷上做过实车验证**，其他桌面属于同理可用、需自行确认。
+
+### 判定与验证命令
+
+```bash
+# ① 当前默认 HOME 是谁
+adb shell "cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME"
+
+# ② 熄火后，该桌面有没有被 Force stopping（有它 = 这条路不成立）
+adb shell "logcat -b all | grep 'Force stopping'" | grep -i <桌面包名>
+adb shell "logcat -b all | grep am_kill" | grep -i <桌面包名>
+
+# ③ 点火后，本包是不是被它用 activity 拉起来的
+adb shell "logcat -b events | grep am_proc_start | grep pwoff"      # reason 应为 activity
+adb shell "dumpsys package com.sgmwyunduo.pwoff | grep -E 'stopped=|notLaunched='"
+```
+
+三条都通过，才说明该桌面可以替代乐酷；任何一条不满足，换桌面也不会让"零人工自启"成立。
+
+> 注意：如果新桌面不是默认 HOME，先确认它自己在每次点火后是否真的会起来——它不起来，本应用同样没人拉。
+
