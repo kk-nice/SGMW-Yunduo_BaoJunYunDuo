@@ -114,12 +114,15 @@ Windows，无需 Gradle，直接用 SDK 工具链：
 
 一句话结论：熄火时 `system_server` 对本应用执行 `forceStopPackage`，包被钉在 `stopped`，`stopped` 跨点火保留，此后 `BOOT_COMPLETED` / `ACTION_BOOT_HU` / JobScheduler 全部不投递。
 
-### 两种规避
+### 解法（实车已验证，不需要 root、不需要改 OTA）
 
-1. **不改代码**：在乐酷桌面（默认 HOME，不被 force-stop 钉 stopped）的"已启用 app"里把本应用加进去，由它开机 `START_APP` 拉起。
-2. **改系统**：装一个 init 看守进程，每 30s 检查一次 `pidof`，发现进程不在就 `am start` 显式启动 `.BootActivity`。
-   APK 里已经内置了这个无界面入口（`BootActivity`，`Theme.NoDisplay`），配套脚本与 rc 在 [`watchdog/`](watchdog/)。
-   **注意**：这一路需要往 `/vendor` 写文件，受分区校验约束，落地通道见 [`watchdog/README.md`](watchdog/README.md)。
+**在乐酷桌面（`com.lecoauto`）里把本应用加入"自启 / 已启用 app"列表，配置一次即可。**
+
+乐酷是默认 HOME，熄火时系统只对它执行普通 `am_kill`（reason=0），**不会把它钉进 `stopped`**；它开机后遍历自启列表，对每一项发出 `START_APP`（= `startActivity`）。本应用带 `LAUNCHER` 类别，因此能被列进去。`startActivity` 显式启动组件的同时会把本包的 `stopped` 清掉，之后的 `BootReceiver` / JobScheduler 在这一轮点火里也恢复投递。
+
+机制取证、配置步骤与验收清单见 👉 [`docs/leco-autostart.md`](docs/leco-autostart.md)
+
+> 另一条路（往 `/vendor` 装 init 看守）需要系统写权限。`/vendor` 只读且受 dm-verity 保护，`adb root` 的 overlay 重启即丢，改 `vendor.img` 要过 `update_entity` 分区签名 —— **不 root、不 OTA 时这条路不成立**，仅作备选留档，见 [`watchdog/`](watchdog/)。
 
 ---
 

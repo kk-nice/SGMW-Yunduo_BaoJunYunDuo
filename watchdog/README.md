@@ -1,4 +1,8 @@
-# init 看守方案（不随应用被杀）
+# init 看守方案（备选留档 · 需系统写权限）
+
+> **本车已验证不需要它。** 免 root、免改 OTA 的解法是乐酷桌面托管，见 [`../docs/leco-autostart.md`](../docs/leco-autostart.md)。
+> 本节只在"能写 `/vendor`"的前提下成立：`/vendor` 只读且受 dm-verity 保护，`adb root` 的 overlay 重启即丢，
+> 改 `vendor.img` 要过 `update_entity` 的分区签名校验。**不 root、不 OTA 时这条路不成立。**
 
 ## 为什么要它
 
