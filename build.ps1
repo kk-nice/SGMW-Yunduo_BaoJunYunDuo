@@ -8,7 +8,7 @@ $BT = Join-Path $ANDROID_HOME 'build-tools\35.0.0'
 $ANDROID_JAR = Join-Path $ANDROID_HOME 'platforms\android-28\android.jar'
 $OUT = Join-Path $HERE 'build'
 $KEYSTORE = Join-Path $HERE 'release.keystore'
-$APK = Join-Path $HERE 'PedestrianWarningOff.apk'
+$APK = Join-Path $HERE 'PedestrianWarningOff-Yunduo.apk'
 
 if (-not (Test-Path -LiteralPath $ANDROID_JAR)) { throw "android.jar not found: $ANDROID_JAR (run: sdkmanager 'platforms;android-28')" }
 if (-not (Test-Path -LiteralPath (Join-Path $BT 'aapt2.exe'))) { throw "build-tools 35.0.0 not found under $BT" }
@@ -27,6 +27,8 @@ if (-not $jdkBin) {
 if (-not $jdkBin) { throw 'JDK not found: jar.exe not located (set JAVA_HOME or install a JDK under C:\Program Files\Java)' }
 $JAR = Join-Path $jdkBin 'jar.exe'
 $KEYTOOL = Join-Path $jdkBin 'keytool.exe'
+$JAVAC = Join-Path $jdkBin 'javac.exe'
+if (-not (Test-Path -LiteralPath $JAVAC)) { throw "javac not found: $JAVAC" }
 
 if (Test-Path -LiteralPath $OUT) { Remove-Item -Recurse -Force -LiteralPath $OUT }
 New-Item -ItemType Directory -Force -Path (Join-Path $OUT 'classes'), (Join-Path $OUT 'dex') | Out-Null
@@ -34,10 +36,11 @@ New-Item -ItemType Directory -Force -Path (Join-Path $OUT 'classes'), (Join-Path
 # 1) javac -> .class
 $srcs = @(Get-ChildItem -Recurse -LiteralPath (Join-Path $HERE 'src') -Filter '*.java' | ForEach-Object { $_.FullName })
 if ($srcs.Count -eq 0) { throw 'no java sources found under src/' }
-& javac -source 11 -target 11 -encoding UTF-8 -Xlint:-options -classpath $ANDROID_JAR -d (Join-Path $OUT 'classes') @srcs
+& $JAVAC -source 11 -target 11 -encoding UTF-8 -Xlint:-options -classpath $ANDROID_JAR -d (Join-Path $OUT 'classes') @srcs
 if ($LASTEXITCODE -ne 0) { throw "javac failed with exit code $LASTEXITCODE" }
 
 # 2) d8 -> classes.dex (min API 28 = Android 9)
+$env:JAVA_HOME = Split-Path -Parent $jdkBin
 $classes = @(Get-ChildItem -Recurse -LiteralPath (Join-Path $OUT 'classes') -Filter '*.class' | ForEach-Object { $_.FullName })
 & (Join-Path $BT 'd8.bat') --min-api 28 --lib $ANDROID_JAR --output (Join-Path $OUT 'dex') @classes
 if ($LASTEXITCODE -ne 0) { throw "d8 failed with exit code $LASTEXITCODE" }

@@ -1,19 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.sgmwstarlight.pwoff"
+    package="com.sgmwyunduo.pwoff"
     android:versionCode="1"
     android:versionName="1.0">
 
-    <uses-sdk android:minSdkVersion="28" android:targetSdkVersion="28" />
+    <uses-sdk
+        android:minSdkVersion="28"
+        android:targetSdkVersion="28" />
 
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-
-    <!--
-        Android 11+ package visibility: needed to bind the vehicle settings service.
-        Only required when targeting API 30+; Android 9 (API 28) has no package
-        visibility restriction, so this block is removed for the Android 9 build.
-    -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- CAR_INFO 在本车 framework 的 protectionLevel = 0x0 (normal)，安装即授予 -->
+    <uses-permission android:name="android.car.permission.CAR_INFO" />
 
     <application
         android:label="行人警示自动关闭"
@@ -23,7 +22,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:theme="@android:style/Theme.DeviceDefault.Dialog">
+            android:excludeFromRecents="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -34,11 +33,18 @@
             android:name=".GuardService"
             android:exported="false" />
 
+        <!-- 持久化 JobService：系统 JobScheduler 在开机后拉起，绕开 BOOT_COMPLETED 投递 -->
+        <service
+            android:name=".BootJobService"
+            android:exported="true"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
+
         <receiver
             android:name=".BootReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.ACTION_BOOT_HU" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>

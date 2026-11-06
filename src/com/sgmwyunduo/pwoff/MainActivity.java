@@ -1,16 +1,16 @@
-package com.sgmwstarlight.pwoff;
+package com.sgmwyunduo.pwoff;
 
 import android.app.Activity;
 import android.os.Bundle;
 import android.widget.Toast;
 
-/** Opening the app (re)starts the guard and immediately runs one check. */
 public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        GuardService.schedulePersistedJob(this);
         GuardService.start(this, "manual");
-        Toast.makeText(this, "行人警示自动关闭：已启动", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "行人警示自动关闭已启动（云朵版）", Toast.LENGTH_LONG).show();
         finish();
     }
 }

@@ -1,167 +1,117 @@
-# 星光行人警示自动关闭（PedestrianWarningOff）
+# 云朵（E230）行人警示自动关闭（PedestrianWarningOff · Yunduo）
 
-**2025 款上汽通用五菱星光**车机的一个小工具：每次车机开机或从休眠中唤醒后，**自动关闭行人警示（低速行人提示音）**，省去每次上车都要手动关闭的麻烦。
+**宝骏云朵（E230 / spm8666p2_64_car / MT8666 / Android 9 / API 28 / LingOS）**车机的一个小工具：通过 CarService 厂商属性关闭**低速行人警示（PWS）**，免去每次上车手动关的麻烦。
 
 > [!WARNING]
 > **本项目仅供测试和临时应急使用，不是维修方案。**
-> 行人警示是保护行人安全的功能。蜂鸣器出现故障后，请尽快到 4S 店检修或更换对应部件。修好后请卸载本 App。使用前请务必阅读文末的[免责声明](#免责声明)。
+> 行人警示是保护行人安全的功能。使用前请务必阅读文末的[免责声明](#免责声明)。
 
 ---
 
-## 为什么做这个
+## 分支说明
 
-有些 25 款星光车主遇到过行人警示蜂鸣器故障，主要有两种情况：
-
-- **异常噪声**：蜂鸣器发出尖锐刺耳的声音，车内噪音很大，影响驾驶；
-- **故障失效**：蜂鸣器已经不能正常提示，开着这个功能也没有意义。
-
-车机设置里可以手动关闭行人警示，但**每次启动车辆后它都会自动恢复为开启**，所以每次上车都得先手动关一遍。
-
-本 App 会在每次开机或唤醒后自动帮你完成这一步。它在等待维修期间作为临时过渡使用，**不能代替维修**。
-
-## 适用范围
-
-| 项目 | 说明 |
+| 分支 | 对应车型 |
 |---|---|
-| 适用车型 | **仅限 2025 款上汽通用五菱星光** |
-| 23 / 24 款星光 | ⚠️ **未经测试**，不保证可用，不建议安装 |
-| 其他五菱 / 宝骏车型 | ❌ 不适用 |
-| 实测车机环境 | Android Automotive 13（API 33），车机设置应用 `com.sgmw.vehiclesettings`（VehicleSetting_F511C） |
+| `main` | 2025 款五菱星光（SGMW Starlight） |
+| `yunduo` | 宝骏云朵 E230（本分支） |
 
-> 本 App 依赖车机系统设置应用里的一个内部接口。车机 OTA 升级后，这个接口**可能会被修改或移除**，导致 App 失效。升级车机系统后请重新确认它是否还能正常工作。
+两个车型的 PWS 开关入口不同：星光走的是设置应用里的按钮，云朵在二级菜单里且不挂挡无效，所以云朵版直接写 CarService 厂商属性。
 
-## 功能特点
+---
 
-- **自动关闭**：车机开机、熄火休眠后再唤醒时，自动检测并关闭行人警示
-- **尊重手动操作**：只在启动后的一小段时间内起作用。行车途中你手动打开行人警示，App **不会**再去关它
-- **不改系统**：不需要 Root，不改任何系统文件。它调用的是车机设置应用自己的开关接口，效果和在设置里手动点"关闭"完全一样
-- **轻量**：安装包约 16 KB，不需要联网，不收集任何数据，没有第三方依赖
+## 已实车验证的部分
 
-## 工作原理
+| 项目 | 状态 |
+|---|---|
+| 写厂商属性 `0x21705074` 关闭 PWS | ✅ 实车生效 |
+| `android.car.permission.CAR_INFO` 安装即授予 | ✅ `/data/app` 普通安装可用 |
+| 挡位门控（P 挡先 defer，非 P 挡才写） | ✅ 逻辑正确，日志可证 |
+| 每次点火零人工自动启动 | ❌ **未达成**，原因与规避方案见 [`docs/boot-autostart.md`](docs/boot-autostart.md) |
 
-```
-车机开机 / 休眠唤醒 / 长时间熄屏后亮屏
-        │
-        ▼
-   进入"守护"状态，每 2 秒查一次行人警示状态
-        │
-        ├─ 检测到【开启】→ 发送关闭指令（与设置里手动关闭完全相同）
-        │
-        ├─ 关闭后稳定保持 60 秒 → 退出守护，之后不再干预
-        │
-        └─ 唤醒后 20 分钟内一直没检测到开启 → 退出守护
-```
+---
 
-技术细节：
+## 原理
 
-- 车机设置应用 `com.sgmw.vehiclesettings` 对外提供了 AIDL 服务 `IVechicleSettingsInterface`（Action `com.sgmw.vehiclesettings.USERSERVICE`）。本 App 绑定这个服务，调用其中的 `getPedestrianWarning()` 和 `setPedestrianWarning(2)`；
-- 设置应用收到请求后，会把车辆属性 `0x21400172` 写为 `2`（关闭），再由车辆 HAL 下发到整车；
-- 车机熄火后通常是**深度休眠**而不是关机，所以 App 除了监听开机广播，还会通过"系统时钟跳变"和"熄屏一段时间后亮屏"这两个信号判断车机是否刚被唤醒。
+### 为什么不用点设置里的按钮
 
-## 安装
+云朵的 PWS 开关在设置的**二级菜单**里（`车辆 → 驾驶`），而且**不挂挡时点了也无效**。所以本应用不碰 UI，直接写属性。
 
-### 准备
-
-- 一台电脑，已安装 [Android Platform Tools](https://developer.android.com/tools/releases/platform-tools)（`adb`）
-- 车机已开启 ADB 调试，并且和电脑在同一个局域网（例如电脑连上车机热点）
-
-> 开启车机 ADB 调试的方法因车机版本而异，本项目不提供说明。
-
-### 步骤
-
-```bash
-# 1. 无线连接车机（IP 和端口按你的实际情况替换）
-adb connect <车机IP>:<端口>
-
-# 2. 安装 App
-adb install -r PedestrianWarningOff.apk
-
-# 3. 首次启动一次（激活开机自启）
-adb shell am start -n com.sgmwstarlight.pwoff/.MainActivity
-```
-
-启动后车机上会提示"行人警示自动关闭：已启动"。之后不用再管它，每次开机或唤醒都会自动生效。
-
-### 验证是否生效
-
-```bash
-adb logcat -s PwOff
-```
-
-正常情况下能看到类似日志：
+### 直接写 CarService 厂商属性
 
 ```
-I PwOff   : armed: resumed after 3600s sleep
-I PwOff   : pedestrian warning is ON, sending OFF (attempt 1)
-I PwOff   : pedestrian warning is OFF
-I PwOff   : disarmed: stayed off for 60s
+PEDESTRIAN_WARNING = 561008756 = 0x21705074
+写入：byte[] {2} = 关，{1} = 开
+读取：byte[0]，1 = 开，0 = 关
+area = 0
 ```
 
-## 卸载
+权限在 `PropertyHalServiceIds.java` 里登记为 `(CAR_INFO, CAR_INFO)`，而 `android.car.permission.CAR_INFO` 在本车 framework 中的 protectionLevel 是 `0x00000000`（normal），**`<uses-permission>` 声明即授予**，不需要平台签名，也不需要进 `priv-app`。
 
-蜂鸣器修好后，请卸载本 App，恢复行人警示的正常功能：
+服务端唯一门禁是 `CarPropertyService` 的配置表检查 + `assertPermission`，通过后即 `mHal.setProperty`。
 
-```bash
-adb uninstall com.sgmwstarlight.pwoff
+### 挡位门控
+
+```
+CURRENT_GEAR = 557862945 = 0x21405021     // CAR_INFO，可读
+3 = P 挡
 ```
 
-卸载后，行人警示会恢复为车辆原厂的默认行为。
+读到 P 挡时**不写**，只挂起等待（`defer until gear engaged`）；挂入非 P 挡后才写属性。这是云朵特有的约束——不挂挡写入无效。
 
-## 自行编译
+### 重复补发
 
-本项目没有用 Gradle，只依赖 JDK 和 Android SDK 命令行工具：
+单次写入可能被 MCU 侧状态机忽略，所以读回 ON 后按固定节奏补发：
 
-- JDK 17
-- Android SDK Build-Tools 34.0.0
-- Android SDK Platform 33
-
-```bash
-export JAVA_HOME=$(/usr/libexec/java_home -v 17)   # macOS 示例
-export ANDROID_HOME=$HOME/Library/Android/sdk
-./build.sh
+```
+POLL_ARMED_MS   = 2s      // 挂起期间轮询间隔
+RESEND_MS       = 3s      // 读到 ON 就每 3 秒补发一次 OFF
+SETTLE_MS       = 60s     // 读回 OFF 后观察 60 秒确认稳定才 disarm
+ARM_TIMEOUT_MS  = 20min   // 20 分钟关不上就放弃
 ```
 
-第一次编译时会自动生成签名文件 `release.keystore`。**请妥善保管它**：以后升级 App 必须用同一个签名，否则要先卸载旧版才能安装新版。
+同时注册了一个**持久化 JobScheduler 任务**（job id `8801`），作为开机广播的备份触发通道。
 
-### Android 9（API 28）构建变体
+---
 
-原版面向 Android Automotive 13（API 33）。本仓库的 `build.ps1` 提供 Windows 下的 Android 9 构建变体：
+## 构建
 
-- 需要：JDK 17+、Android SDK `platforms;android-28` 和 `build-tools;35.0.0`（D8 8.3 起才兼容 JDK 21 编译产物）；
-- 相对原版的改动：
-  - `AndroidManifest.xml`：`minSdkVersion`/`targetSdkVersion` 33 → 28；移除 API 33 才有的 `POST_NOTIFICATIONS` 权限；移除 `<queries>`（Android 11+ 才有的包可见性概念，Android 9 无此限制）；
-  - `GuardService.java`：`Context.RECEIVER_NOT_EXPORTED`（API 33+）改为按 `Build.VERSION.SDK_INT` 分支注册屏幕广播，保留 API 33 上的原行为；
-- 编译（Windows）：
+Windows，无需 Gradle，直接用 SDK 工具链：
 
 ```powershell
+# 需要：JDK 21、Android SDK build-tools 35.0.0、platforms;android-28
 .\build.ps1
 ```
 
-产物为 `PedestrianWarningOff.apk`（约 16 KB，minSdk 28）。Android 9 无包可见性限制，无需 `<queries>` 即可绑定 `com.sgmw.vehiclesettings` 服务。注意：此变体去掉了 `<queries>`，若同时要在 Android 11+ 设备上安装，请使用面向 API 33 的原版构建。
+链路是 `javac → d8 → aapt2 → zipalign → apksigner`。
 
-## 项目结构
+构建脚本会在首次运行时用 `keytool` 自动生成 `release.keystore`（别名 `pwoff`）。**签名文件不随仓库提交**（见 `.gitignore`），所以你自己构建出来的 APK 签名与本仓库发布版不一致，这是预期行为。
 
+注意：`build-tools 34.0.0` 的 D8 在 JDK 21 下会崩，必须用 `35.0.0`。
+
+## 安装
+
+```powershell
+.\install.ps1                      # 默认装同目录的 PedestrianWarningOff-Yunduo.apk
+.\install.ps1 -Apk D:\path\x.apk   # 或指定路径
 ```
-├── AndroidManifest.xml
-├── build.sh                         # 编译脚本：javac → d8 → aapt2 → zipalign → apksigner
-└── src/com/sgmwstarlight/pwoff/
-    ├── GuardService.java            # 核心逻辑：前台服务，检测并关闭行人警示
-    ├── BootReceiver.java            # 开机自启
-    └── MainActivity.java            # 手动启动入口
-```
+
+**安装后必须启动一次**（脚本里的 `am start` 就是在做这件事）。原因：`adb install` 之后应用处于 `stopped` 状态，`stopped` 的应用收不到 `BOOT_COMPLETED`。这一步省不得。
+
+---
+
+## 已知限制：开机自启
+
+当前版本在被车机熄火清理后会失去自启能力，需要人工点一次图标。**这不是权限问题，也不是 JobScheduler 参数问题**，详细的取证过程、日志证据和规避方案见：
+
+👉 [`docs/boot-autostart.md`](docs/boot-autostart.md)
+
+一句话结论：熄火时 `system_server` 对本应用执行 `forceStopPackage`，包被钉在 `stopped`，`stopped` 跨点火保留，此后 `BOOT_COMPLETED` / `ACTION_BOOT_HU` / JobScheduler 全部不投递。
+
+---
 
 ## 免责声明
 
-**安装或使用本 App 之前，请仔细阅读以下条款。安装或使用即表示你已阅读、理解并同意全部内容。**
-
-1. **仅供测试和应急**：本项目只用于技术研究、测试，以及蜂鸣器故障期间的临时应急，**不是**车辆维修方案，也不能代替任何正规检修。
-2. **请及时维修**：行人警示（低速行人提示音）用于在车辆低速行驶时提醒周围行人，是重要的安全功能。蜂鸣器发生故障后，请**尽快到上汽通用五菱授权 4S 店检修或更换对应部件**，修好后请立即卸载本 App。
-3. **安全风险**：关闭行人警示后，车辆低速行驶时行人可能察觉不到车辆靠近。使用期间请**格外注意低速行驶时的行人安全**，尤其在小区、停车场、学校周边等行人密集区域。
-4. **不承担责任**：本项目按"现状"提供，不作任何明示或暗示的保证。车机安装本 App 后出现的**任何故障、数据丢失、功能异常、交通事故、人身伤害或财产损失**，以及由此引起的保修纠纷、法律责任，均由使用者自行承担，**作者及贡献者不承担任何责任**。
-5. **法规风险**：部分国家或地区可能对电动汽车低速提示音有强制要求。使用者应自行了解并遵守当地法律法规，因使用本 App 违反相关规定产生的后果由使用者自行承担。
-6. **保修风险**：开启车机调试模式、安装第三方应用，可能影响车辆或车机的官方保修。请自行评估风险。
-7. **非官方项目**：本项目是个人开源项目，与上汽通用五菱汽车股份有限公司及其关联公司**没有任何关联**，也未获得其授权或认可。文中提到的品牌和车型名称仅用于说明适用范围，其商标归各自权利人所有。
-
-## 许可证
-
-[MIT License](LICENSE)
+- 本项目与上汽通用五菱、宝骏、德赛西威无任何关联，属个人实验项目。
+- 行人警示音是国家标准要求的低速提示功能，关闭后**可能影响行人（尤其视障人士）对车辆的感知**。请在封闭场地或明确安全的前提下使用，公共道路行驶请恢复该功能。
+- 修改车辆属性存在不确定性风险，包括但不限于影响其他依赖该属性的功能。因使用本工具造成的一切后果由使用者自行承担。
+- 本项目仅用于学习、研究与个人车辆的临时调试，不得用于商业用途或批量改装。
