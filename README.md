@@ -114,6 +114,13 @@ Windows，无需 Gradle，直接用 SDK 工具链：
 
 一句话结论：熄火时 `system_server` 对本应用执行 `forceStopPackage`，包被钉在 `stopped`，`stopped` 跨点火保留，此后 `BOOT_COMPLETED` / `ACTION_BOOT_HU` / JobScheduler 全部不投递。
 
+### 两种规避
+
+1. **不改代码**：在乐酷桌面（默认 HOME，不被 force-stop 钉 stopped）的"已启用 app"里把本应用加进去，由它开机 `START_APP` 拉起。
+2. **改系统**：装一个 init 看守进程，每 30s 检查一次 `pidof`，发现进程不在就 `am start` 显式启动 `.BootActivity`。
+   APK 里已经内置了这个无界面入口（`BootActivity`，`Theme.NoDisplay`），配套脚本与 rc 在 [`watchdog/`](watchdog/)。
+   **注意**：这一路需要往 `/vendor` 写文件，受分区校验约束，落地通道见 [`watchdog/README.md`](watchdog/README.md)。
+
 ---
 
 ## 免责声明
