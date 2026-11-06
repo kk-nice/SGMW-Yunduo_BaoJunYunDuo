@@ -33,7 +33,7 @@
 | 写厂商属性 `0x21705074` 关闭 PWS | ✅ 实车生效 |
 | `android.car.permission.CAR_INFO` 安装即授予 | ✅ `/data/app` 普通安装可用 |
 | 挡位门控（P 挡先 defer，非 P 挡才写） | ✅ 逻辑正确，日志可证 |
-| 每次点火零人工自动启动 | ❌ **未达成**，原因与规避方案见 [`docs/boot-autostart.md`](docs/boot-autostart.md) |
+| 每次点火零人工自动启动 | ✅ 经乐酷桌面自启（需一次性配置），见 [`docs/leco-autostart.md`](docs/leco-autostart.md) |
 
 ---
 
@@ -121,8 +121,6 @@ Windows，无需 Gradle，直接用 SDK 工具链：
 乐酷是默认 HOME，熄火时系统只对它执行普通 `am_kill`（reason=0），**不会把它钉进 `stopped`**；它开机后遍历自启列表，对每一项发出 `START_APP`（= `startActivity`）。本应用带 `LAUNCHER` 类别，因此能被列进去。`startActivity` 显式启动组件的同时会把本包的 `stopped` 清掉，之后的 `BootReceiver` / JobScheduler 在这一轮点火里也恢复投递。
 
 机制取证、配置步骤与验收清单见 👉 [`docs/leco-autostart.md`](docs/leco-autostart.md)
-
-> 另一条路（往 `/vendor` 装 init 看守）需要系统写权限。`/vendor` 只读且受 dm-verity 保护，`adb root` 的 overlay 重启即丢，改 `vendor.img` 要过 `update_entity` 分区签名 —— **不 root、不 OTA 时这条路不成立**，仅作备选留档，见 [`watchdog/`](watchdog/)。
 
 ---
 

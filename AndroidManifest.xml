@@ -29,19 +29,6 @@
             </intent-filter>
         </activity>
 
-        <!--
-            无界面入口，专供 /vendor/bin/pwoff_watchdog.sh 使用：
-            以 am start 显式指定本组件启动（附带指定 user）。
-            显式启动组件 = AMS 顺带清掉包的 stopped 标志，这是自启失效的真正症结。
-            Theme.NoDisplay + onCreate 内 finish()，不留可见窗口。
-        -->
-        <activity
-            android:name=".BootActivity"
-            android:exported="true"
-            android:excludeFromRecents="true"
-            android:noHistory="true"
-            android:theme="@android:style/Theme.NoDisplay" />
-
         <service
             android:name=".GuardService"
             android:exported="false" />
