@@ -1,6 +1,8 @@
 # Build output
 build/
 *.apk
+# The shipped Yunduo build is versioned so the exact tested binary can be recovered
+!PedestrianWarningOff-Yunduo.apk
 *.idsig
 
 # Signing keys — never commit these
