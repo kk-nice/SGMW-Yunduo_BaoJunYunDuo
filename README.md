@@ -98,7 +98,7 @@ Windows，无需 Gradle，直接用 SDK 工具链：
 ## 安装
 
 ```powershell
-.\install.ps1                      # 默认装同目录的 PedestrianWarningOff-Yunduo.apk
+.\install.ps1                      # 默认装同目录最新的 PedestrianWarningOff-Yunduo-v*.apk
 .\install.ps1 -Apk D:\path\x.apk   # 或指定路径
 ```
 

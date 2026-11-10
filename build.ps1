@@ -8,7 +8,12 @@ $BT = Join-Path $ANDROID_HOME 'build-tools\35.0.0'
 $ANDROID_JAR = Join-Path $ANDROID_HOME 'platforms\android-28\android.jar'
 $OUT = Join-Path $HERE 'build'
 $KEYSTORE = Join-Path $HERE 'release.keystore'
-$APK = Join-Path $HERE 'PedestrianWarningOff-Yunduo.apk'
+# Artifact name is derived from AndroidManifest.xml so the file name, versionCode and
+# versionName can never drift apart.
+$manifestText = Get-Content -LiteralPath (Join-Path $HERE 'AndroidManifest.xml') -Raw
+if ($manifestText -notmatch 'android:versionName\s*=\s*"([^"]+)"') { throw 'android:versionName not found in AndroidManifest.xml' }
+$VERSION = $Matches[1]
+$APK = Join-Path $HERE ("PedestrianWarningOff-Yunduo-v{0}.apk" -f $VERSION)
 
 if (-not (Test-Path -LiteralPath $ANDROID_JAR)) { throw "android.jar not found: $ANDROID_JAR (run: sdkmanager 'platforms;android-28')" }
 if (-not (Test-Path -LiteralPath (Join-Path $BT 'aapt2.exe'))) { throw "build-tools 35.0.0 not found under $BT" }

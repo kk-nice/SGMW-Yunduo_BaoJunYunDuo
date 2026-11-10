@@ -1,5 +1,5 @@
 param(
-    [string]$Apk = "$PSScriptRoot\PedestrianWarningOff-Yunduo.apk",
+    [string]$Apk,
     [string]$Adb
 )
 
@@ -19,6 +19,14 @@ if (-not $Adb) {
         if ($cmd) { $Adb = $cmd.Source }
     }
     if (-not $Adb) { throw 'adb not found: pass -Adb <path>, or set ANDROID_HOME / add adb to PATH' }
+}
+
+# 未指定 -Apk 时，取同目录最新的带版本产物（文件名由 build.ps1 按 versionName 生成）
+if (-not $Apk) {
+    $latest = Get-ChildItem -LiteralPath $PSScriptRoot -Filter 'PedestrianWarningOff-Yunduo-v*.apk' -File |
+        Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    if (-not $latest) { throw 'no PedestrianWarningOff-Yunduo-v*.apk found: run build.ps1 first, or pass -Apk <path>' }
+    $Apk = $latest.FullName
 }
 
 if (-not (Test-Path -LiteralPath $Apk)) { throw "APK not found: $Apk" }
