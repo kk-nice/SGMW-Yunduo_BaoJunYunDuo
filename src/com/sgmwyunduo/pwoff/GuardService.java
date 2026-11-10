@@ -78,6 +78,8 @@ public class GuardService extends Service {
     private long lastTickUptime = -1;
     private long lastTickElapsed = -1;
     private long screenOffAt = -1;
+    private long lastBindAt = -60_000;
+    private long lastNullLogAt = -60_000;
 
     static void start(Context context, String reason) {
         Intent i = new Intent(context, GuardService.class).putExtra(EXTRA_REASON, reason);
@@ -96,6 +98,7 @@ public class GuardService extends Service {
             Log.w(TAG, "CarService disconnected");
             mCar = null;
             mCpm = null;
+            bound = false; // 必须一起清，否则 bindCar() 的 if (bound) 会永久挡住重连
         }
     };
 
@@ -134,10 +137,8 @@ public class GuardService extends Service {
                 Log.w(TAG, "all candidate service names returned null");
                 return;
             }
-            if (armed) {
-                handler.removeCallbacks(tick);
-                handler.post(tick);
-            }
+            handler.removeCallbacks(tick);
+            handler.post(tick);
         } catch (Throwable t) {
             Log.w(TAG, "getCarManager failed", t);
         }
@@ -198,8 +199,13 @@ public class GuardService extends Service {
             lastTickUptime = up;
             lastTickElapsed = el;
 
+            if (mCpm == null) {
+                bindCar(); // 永续重连：armed 与否都要尝试，避免断连后永久静默
+            }
             if (armed) {
                 check();
+            } else {
+                idleScan();
             }
             handler.postDelayed(this, armed ? POLL_ARMED_MS : POLL_IDLE_MS);
         }
@@ -232,6 +238,9 @@ public class GuardService extends Service {
                 .build();
         startForeground(1, n);
 
+        if (mCpm == null) {
+            bindCar(); // 手动/系统启动时立刻补一次连接，不等 tick 轮询
+        }
         String reason = intent != null ? intent.getStringExtra(EXTRA_REASON) : null;
         arm(reason != null ? reason : "restart");
         return START_STICKY;
@@ -270,9 +279,24 @@ public class GuardService extends Service {
     }
 
     private void bindCar() {
-        if (bound) {
+        if (bound && mCar != null && mCpm != null) {
             return;
         }
+        long now = SystemClock.elapsedRealtime();
+        if (now - lastBindAt < 30_000) {
+            return; // 重连限频，避免 2s 一轮的 tick 反复 createCar/disconnect
+        }
+        lastBindAt = now;
+        if (mCar != null) {
+            try {
+                Method disconnect = mCar.getClass().getMethod("disconnect");
+                disconnect.invoke(mCar);
+            } catch (Throwable ignored) {
+            }
+        }
+        mCar = null;
+        mCpm = null;
+        bound = false;
         try {
             Class<?> carCls = Class.forName(CAR_CLASS);
             Method createCar = carCls.getMethod("createCar", Context.class, ServiceConnection.class, Handler.class);
@@ -321,7 +345,12 @@ public class GuardService extends Service {
     private void check() {
         if (mCpm == null) {
             bindCar();
-            if (SystemClock.elapsedRealtime() - armedAt >= ARM_TIMEOUT_MS) {
+            long nullFor = SystemClock.elapsedRealtime() - armedAt;
+            if (nullFor - lastNullLogAt >= 10_000) {
+                lastNullLogAt = nullFor;
+                Log.w(TAG, "check: CarPropertyManager still null (" + nullFor / 1000 + "s since armed), rebinding");
+            }
+            if (nullFor >= ARM_TIMEOUT_MS) {
                 disarm("car service unavailable for " + ARM_TIMEOUT_MS / 60_000 + " min");
             }
             return;
@@ -352,6 +381,21 @@ public class GuardService extends Service {
             }
         } else if (now - armedAt >= ARM_TIMEOUT_MS) {
             disarm("never saw it on within " + ARM_TIMEOUT_MS / 60_000 + " min (last status " + status + ")");
+        }
+    }
+
+    /**
+     * 未 armed 时的低频巡检（10s 一次）：
+     * 1) 充当心跳，保证任何时候 logcat 都能看到进程在活着读属性；
+     * 2) 只要发现 PWS 又变成 ON，立刻重新进高频模式 —— disarm 不再是终点。
+     */
+    private void idleScan() {
+        if (mCpm == null) {
+            return;
+        }
+        int status = getPedestrianWarning();
+        if (status == 1) {
+            arm("idle scan saw pws=1");
         }
     }
 
